@@ -1,6 +1,6 @@
 [package]
 name = "oxio"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Victor Gama <hey@vito.io>"]
 edition = "2018"
 readme = "README.md"
