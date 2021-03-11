@@ -52,6 +52,24 @@ fn get_git_config() -> Result<Signature<'static>> {
     Signature::now(user.as_str(), email.as_str()).into_ox_result()
 }
 
+fn guess_user_private_key() -> Option<String> {
+    let ssh_key = env::var("OXIO_SSH_KEY").unwrap_or_else(|_| String::from(""));
+    if !ssh_key.is_empty() {
+        Some(shellexpand::tilde(&ssh_key).to_string())
+    } else {
+        let guess_key = vec!["id_rsa", "id_ecdsa", "id_ed25519"];
+        let home = env::var("HOME").unwrap();
+        for guess in guess_key {
+            let raw_path = &format!("{}/.ssh/{}", home, guess);
+            let p = Path::new(raw_path);
+            if p.exists() {
+                return Some(p.to_str().unwrap().to_string())
+            }
+        }
+        None
+    }
+}
+
 fn ssh_callbacks() -> RemoteCallbacks<'static> {
     let mut callbacks = RemoteCallbacks::new();
     callbacks.credentials(|_url, username_from_url, allowed_types| {
@@ -60,12 +78,15 @@ fn ssh_callbacks() -> RemoteCallbacks<'static> {
         }
 
         if allowed_types.is_ssh_key() {
-            Cred::ssh_key(
-                username_from_url.unwrap(),
-                None,
-                std::path::Path::new(&format!("{}/.ssh/id_rsa", env::var("HOME").unwrap())),
-                None,
-            )
+            match guess_user_private_key() {
+                Some(path) => Cred::ssh_key(
+                    username_from_url.unwrap(),
+                    None,
+                    std::path::Path::new(path.as_str()),
+                    None,
+                ),
+                None => Err(git2::Error::from_str("unable to get private key"))
+            }
         } else {
             Err(git2::Error::from_str("unable to get private key"))
         }
