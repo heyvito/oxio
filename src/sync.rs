@@ -63,7 +63,7 @@ fn guess_user_private_key() -> Option<String> {
             let raw_path = &format!("{}/.ssh/{}", home, guess);
             let p = Path::new(raw_path);
             if p.exists() {
-                return Some(p.to_str().unwrap().to_string())
+                return Some(p.to_str().unwrap().to_string());
             }
         }
         None
@@ -77,18 +77,18 @@ fn ssh_callbacks() -> RemoteCallbacks<'static> {
             return Cred::username(username_from_url.unwrap());
         }
 
-        if allowed_types.is_ssh_key() {
-            match guess_user_private_key() {
-                Some(path) => Cred::ssh_key(
-                    username_from_url.unwrap(),
-                    None,
-                    std::path::Path::new(path.as_str()),
-                    None,
-                ),
-                None => Err(git2::Error::from_str("unable to get private key"))
-            }
-        } else {
-            Err(git2::Error::from_str("unable to get private key"))
+        if !allowed_types.is_ssh_key() {
+            return Err(git2::Error::from_str("unable to get private key"));
+        }
+
+        match guess_user_private_key() {
+            Some(path) => Cred::ssh_key(
+                username_from_url.unwrap(),
+                None,
+                std::path::Path::new(path.as_str()),
+                None,
+            ),
+            None => Err(git2::Error::from_str("unable to get private key"))
         }
     });
     callbacks
@@ -265,13 +265,24 @@ pub fn perform_sync(repo: &Repository) -> Operation {
     )?;
     rebase.finish(Some(&sig))?;
     repo.set_head(&current_branch)?;
+
     let mut result = Ok(());
-    if should_push {
+    if should_push || should_push_commits(repo)? {
         ox_println!("Pushing changes...");
         result = push(repo, current_branch.as_str());
     }
     ox_println!("Sync complete");
     result
+}
+
+fn should_push_commits(repo: &Repository) -> Result<bool> {
+    let fetch_head = repo.find_reference("FETCH_HEAD")?;
+    let fetch_commit = repo.reference_to_annotated_commit(&fetch_head)?;
+    let current_head = repo.find_reference("HEAD")?;
+    let current_commit = repo.reference_to_annotated_commit(&current_head)?;
+
+    let result = repo.graph_ahead_behind(current_commit.id(), fetch_commit.id())?;
+    Ok(result.0 != 0 || result.1 != 0)
 }
 
 pub fn init_sync_existing(remote: String) -> Operation {
