@@ -57,7 +57,7 @@ USAGE:
    {ox} {hp}                        Shows this message
 
 VERSION:
-   0.1.0
+   0.1.3
 ", ox = "oxio".cyan(), itemna = "ITEMNAME".blue(), grpname = "GROUPNAME".blue(),
                            val = "VALUE".blue(), u = "URL".blue(),
                            l = "all".yellow(), rm_grp = "rm-group".yellow(), rm_it = "rm-item".yellow(),
@@ -433,4 +433,3 @@ fn main() {
         _ => help(),
     }
 }
-
